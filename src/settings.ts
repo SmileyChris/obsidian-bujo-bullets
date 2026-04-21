@@ -57,6 +57,7 @@ export class BuJoPluginSettingTab extends PluginSettingTab {
             .onChange(async (value) => {
               this.plugin.settings.signifiers[index].value = value;
               await this.plugin.saveSettings();
+              this.plugin.refreshEditors();
             })
         })
         .addText((cb) => {
@@ -65,6 +66,7 @@ export class BuJoPluginSettingTab extends PluginSettingTab {
             .onChange(async (value) => {
               this.plugin.settings.signifiers[index].name = value;
               await this.plugin.saveSettings();
+              this.plugin.refreshEditors();
             })
         })
         .addExtraButton((cb) => {
@@ -73,6 +75,7 @@ export class BuJoPluginSettingTab extends PluginSettingTab {
             .onClick(async () => {
               this.plugin.settings.signifiers.splice(index, 1);
               await this.plugin.saveSettings();
+              this.plugin.refreshEditors();
               // Force refresh
               this.display();
             });
@@ -86,6 +89,7 @@ export class BuJoPluginSettingTab extends PluginSettingTab {
         .onClick(async () => {
             this.plugin.settings.signifiers.push({ name: "", value: "" });
             await this.plugin.saveSettings();
+            this.plugin.refreshEditors();
             // Force refresh
             this.display();
         });

@@ -1,7 +1,9 @@
 import { Menu, Plugin } from 'obsidian';
+import type { EditorView } from "@codemirror/view";
 import { CommandHandler } from './handlers/command-handler';
 import { isBulletText, updateBulletType } from './core/bullet-utils';
 import { wrapSignifiers } from './core/signifier';
+import { signifierExtension } from './editor/signifier-extension';
 import {
   BuJoPluginSettings,
   BuJoPluginSettingTab,
@@ -19,6 +21,8 @@ export default class BuJoPlugin extends Plugin {
   async onload() {
     await this.loadSettings();
     this.commandHandler = new CommandHandler(this);
+
+    this.registerEditorExtension(signifierExtension(() => this.settings.signifiers));
 
     this.registerMarkdownPostProcessor((element, _context) => {
       wrapSignifiers(element, this.settings.signifiers);
@@ -111,5 +115,15 @@ export default class BuJoPlugin extends Plugin {
 
   async saveSettings() {
     await this.saveData(this.settings);
+  }
+
+  refreshEditors(): void {
+    this.app.workspace.iterateAllLeaves((leaf) => {
+      const view = leaf.view as { editor?: { cm?: EditorView } };
+      const cm = view?.editor?.cm;
+      if (cm) {
+        cm.dispatch({});
+      }
+    });
   }
 }
