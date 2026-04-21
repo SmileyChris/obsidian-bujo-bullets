@@ -35,4 +35,12 @@ describe("updateBulletType", () => {
   it("throws on non-bullet input", () => {
     expect(() => updateBulletType("hello", { name: "Complete", character: "x" })).toThrow();
   });
+
+  it("swaps to the In-Progress character", () => {
+    expect(updateBulletType("- [ ] task", { name: "In-Progress", character: "/" })).toBe("- [/] task");
+  });
+
+  it("round-trips In-Progress back to Incomplete", () => {
+    expect(updateBulletType("- [/] task", { name: "Incomplete", character: " " })).toBe("- [ ] task");
+  });
 });
