@@ -1,6 +1,7 @@
 import { Menu, Plugin } from 'obsidian';
 import type { EditorView } from "@codemirror/view";
 import { CommandHandler } from './handlers/command-handler';
+import { EditorMenuHandler } from './handlers/editor-menu-handler';
 import { isBulletText, updateBulletType } from './core/bullet-utils';
 import { wrapSignifiers } from './core/signifier';
 import { signifierExtension } from './editor/signifier-extension';
@@ -17,10 +18,12 @@ export type { Bullet } from "./core/bullet-types";
 export default class BuJoPlugin extends Plugin {
   settings: BuJoPluginSettings;
   commandHandler: CommandHandler;
+  editorMenuHandler: EditorMenuHandler;
 
   async onload() {
     await this.loadSettings();
     this.commandHandler = new CommandHandler(this);
+    this.editorMenuHandler = new EditorMenuHandler(this);
 
     this.registerEditorExtension(signifierExtension(() => this.settings.signifiers));
 
