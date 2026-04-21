@@ -5,6 +5,18 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## 1.3.0 - 2026-04-21
+
+### Added
+
+- `- [/]` In-Progress bullet type with matching icon and command
+- Signifier coloring now applies in Live Preview, not just Reading view
+
+### Fixed
+
+- Signifiers no longer double-wrap or corrupt inline content when the signifier character appears later on the line (#3)
+- Removed duplicated iteration over checkbox list items (#3, supersedes #4)
+
 ## 1.2.1 - 2025-03-08
 
 ### Fixed

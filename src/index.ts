@@ -1,26 +1,18 @@
 import { Menu, Plugin } from 'obsidian';
+import type { EditorView } from "@codemirror/view";
 import { CommandHandler } from './handlers/command-handler';
 import { isBulletText, updateBulletType } from './core/bullet-utils';
-import * as DOMPurify from 'isomorphic-dompurify';
+import { wrapSignifiers } from './core/signifier';
+import { signifierExtension } from './editor/signifier-extension';
 import {
   BuJoPluginSettings,
   BuJoPluginSettingTab,
   DEFAULT_SETTINGS
 } from './settings';
+import { AVAILABLE_BULLETS_TYPES } from "./core/bullet-types";
 
-export type Bullet = {
-  name: string
-  character: string
-}
-
-export const AVAILABLE_BULLETS_TYPES: Bullet[] = [
-  { name: 'Incomplete', character: ' ' },
-  { name: 'Complete', character: 'x' },
-  { name: 'Irrelevant', character: '-' },
-  { name: 'Migrated', character: '>' },
-  { name: 'Scheduled', character: '<' },
-  { name: 'Event', character: 'o' },
-]
+export { AVAILABLE_BULLETS_TYPES } from "./core/bullet-types";
+export type { Bullet } from "./core/bullet-types";
 
 export default class BuJoPlugin extends Plugin {
   settings: BuJoPluginSettings;
@@ -30,36 +22,14 @@ export default class BuJoPlugin extends Plugin {
     await this.loadSettings();
     this.commandHandler = new CommandHandler(this);
 
+    this.registerEditorExtension(signifierExtension(() => this.settings.signifiers));
+
     this.registerMarkdownPostProcessor((element, _context) => {
-      const renderedNotes = element.findAll('ul > li')
-      const renderedCheckboxes = element.findAll('.task-list-item')
-      const renderedBullets = [...renderedNotes, ...renderedCheckboxes]
+      wrapSignifiers(element, this.settings.signifiers);
 
-      if (renderedBullets.length === 0) {
-        return
-      }
-
-      // Process signifiers
-      for (let bullet of renderedBullets) {
-        const bulletText = bullet.innerText
-        const signifiers = this.settings.signifiers;
-        
-        for (let signifier of signifiers) {
-          const signifierText = signifier.value;
-
-          if (bulletText.startsWith(signifierText + ' ')) {
-            let html = bullet.innerHTML;
-            let sanitizedText = DOMPurify.sanitize(signifierText);
-            
-            html = html.replace(signifierText, `<span class="bujo-bullet-signifier">${sanitizedText}</span>`);
-            bullet.innerHTML = html
-          }
-        }
-      }
-
-      // Process checkboxes
+      const renderedCheckboxes = element.findAll(".task-list-item");
       if (renderedCheckboxes.length === 0) {
-        return
+        return;
       }
 
       renderedCheckboxes.forEach((bullet, index) => {
@@ -145,5 +115,15 @@ export default class BuJoPlugin extends Plugin {
 
   async saveSettings() {
     await this.saveData(this.settings);
+  }
+
+  refreshEditors(): void {
+    this.app.workspace.iterateAllLeaves((leaf) => {
+      const view = leaf.view as { editor?: { cm?: EditorView } };
+      const cm = view?.editor?.cm;
+      if (cm) {
+        cm.dispatch({});
+      }
+    });
   }
 }
