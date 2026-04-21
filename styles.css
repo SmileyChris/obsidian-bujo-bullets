@@ -92,21 +92,8 @@ input[data-task="/"],
 li[data-task="/"] > input,
 li[data-task="/"] > p > input {
   &:checked {
-    background-image: none;
-    background-color: transparent;
-    position: relative;
-    overflow: hidden;
-    &::after {
-      top: 0;
-      left: 0;
-      content: " ";
-      display: block;
-      position: absolute;
-      background-color: var(--background-modifier-accent);
-      width: calc(50% - 0.5px);
-      height: 100%;
-      -webkit-mask-image: none;
-    }
+    color: var(--color-accent);
+    -webkit-mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='currentColor'%3E%3Cpath d='M10 2a8 8 0 000 16V2z' /%3E%3C/svg%3E");
   }
 }
 
