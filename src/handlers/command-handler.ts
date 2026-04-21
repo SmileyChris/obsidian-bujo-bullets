@@ -1,5 +1,6 @@
-import BuJoPlugin, { AVAILABLE_BULLETS_TYPES } from "src";
-import { isBulletText, updateBulletType } from "src/core/bullet-utils";
+import BuJoPlugin from "src";
+import { AVAILABLE_BULLETS_TYPES } from "../core/bullet-types";
+import { isBulletText, updateBulletType } from "../core/bullet-utils";
 
 export class CommandHandler {
   private plugin: BuJoPlugin;

@@ -7,20 +7,10 @@ import {
   BuJoPluginSettingTab,
   DEFAULT_SETTINGS
 } from './settings';
+import { AVAILABLE_BULLETS_TYPES } from "./core/bullet-types";
 
-export type Bullet = {
-  name: string
-  character: string
-}
-
-export const AVAILABLE_BULLETS_TYPES: Bullet[] = [
-  { name: 'Incomplete', character: ' ' },
-  { name: 'Complete', character: 'x' },
-  { name: 'Irrelevant', character: '-' },
-  { name: 'Migrated', character: '>' },
-  { name: 'Scheduled', character: '<' },
-  { name: 'Event', character: 'o' },
-]
+export { AVAILABLE_BULLETS_TYPES } from "./core/bullet-types";
+export type { Bullet } from "./core/bullet-types";
 
 export default class BuJoPlugin extends Plugin {
   settings: BuJoPluginSettings;
