@@ -11,7 +11,7 @@ Obsidian community plugin that renders Bullet Journal styled checkboxes (`- [ ]`
 - `npm run dev` — esbuild watch mode, rebuilds `main.js` on change. Runs indefinitely.
 - `npm run build` — `tsc -noEmit -skipLibCheck` typecheck, then production bundle to `main.js`.
 - `npm test` / `npm run test:watch` — vitest (jsdom env). Tests live in `tests/` and import from `src/...` via the alias in `vitest.config.ts`; `tests/mocks/obsidian.ts` stubs the `obsidian` module for pure-helper tests.
-- `npx eslint src` — lint (no npm script; eslint config at `.eslintrc`).
+- `npm run lint` — eslint 9 flat config at `eslint.config.mjs`.
 - `npm version patch|minor|major` — bumps `package.json`, then `version-bump.mjs` syncs `manifest.json` + `versions.json` and stages them. Pushing the resulting tag triggers `.github/workflows/release.yml` which builds and drafts a GitHub release with `main.js`, `manifest.json`, `styles.css`.
 
 ## Architecture
