@@ -22,7 +22,7 @@ BuJo Bullets adds support for the following bullet types:
 ```markdown
 - [ ] incomplete task
 - [x] completed task
-- [-] irrelevant task
+- [-] cancelled task
 - [>] migrated task
 - [<] scheduled task
 - [o] event
@@ -50,7 +50,7 @@ This plugin also provides Obsidian commands and hotkeys to change the bullet typ
 Per [Obsidian's recommendations](https://docs.obsidian.md/Plugins/User+interface/Commands#Hot+keys) default hotkey values are not set, but here are some suggestions:
 - Change to "incomplete task" - `Ctrl/Cmd + I`
 - Change to "completed task" - `Ctrl/Cmd + D`
-- Change to "irrelevant task" - `Ctrl/Cmd + ~`
+- Change to "cancelled task" - `Ctrl/Cmd + ~`
 - Change to "migrated task" - `Ctrl/Cmd + >`
 - Change to "scheduled task" - `Ctrl/Cmd + <`
 - Change to "event" - `Ctrl/Cmd + shift + o`

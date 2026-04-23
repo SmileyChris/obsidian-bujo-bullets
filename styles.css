@@ -35,7 +35,7 @@ li[data-task="/"] > p > input {
   }
 }
 
-/* [-] Canceled Task */
+/* [-] Cancelled Task */
 input[data-task="-"],
 li[data-task="-"] > input,
 li[data-task="-"] > p > input {
