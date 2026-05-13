@@ -111,14 +111,75 @@ li[data-task="/"] > p > input {
      data-bujo-day="Xxx"     → grey calendar, day text overlay
 */
 
-/* Override the [o] accent fill to grey for any deferred form.
-   In Obsidian's rendered HTML the input does NOT carry data-task — only the
-   parent <li> does — so we must mirror the same selector shape the base
-   [o] rule uses (`li[data-task] > input`) rather than checking the input. */
+/* Calendar (the [o] icon) goes grey when the event is deferred or cancelled.
+   Completed events keep the accent calendar — only their text is muted.
+   Obsidian doesn't put data-task on the <input>, only on the <li>, so we
+   mirror the existing [o] rule's selector shape (`li[data-task] > input`). */
 li[data-bujo-day][data-task="o"] > input:checked,
 li[data-bujo-day][data-task="o"] > p > input:checked,
-.cm-line[data-bujo-day] input.task-list-item-checkbox:checked {
+li[data-bujo-status="cancelled"][data-task="o"] > input:checked,
+li[data-bujo-status="cancelled"][data-task="o"] > p > input:checked,
+.cm-line[data-bujo-day] input.task-list-item-checkbox:checked,
+.cm-line[data-bujo-status="cancelled"] input.task-list-item-checkbox:checked {
   color: var(--text-faint);
+}
+
+/* Migrated event ([o] [>]) — plain grey calendar; the migrated state is
+   conveyed by the muted color alone. */
+li[data-bujo-action][data-task="o"] > input:checked,
+li[data-bujo-action][data-task="o"] > p > input:checked,
+.cm-line[data-bujo-action] input.task-list-item-checkbox:checked {
+  color: var(--text-faint);
+}
+
+/* Scheduled event ([o] [<]) — full grey calendar (from the rule above)
+   plus a small white arrow overlaid in the bottom-right corner. The
+   arrow is rendered through `::after` with a mask + background-color so it
+   contrasts against the grey calendar underneath. */
+li[data-bujo-action="scheduled"]::after,
+.cm-line[data-bujo-action="scheduled"]::after {
+  content: "";
+  position: absolute;
+  width: calc(var(--checkbox-size, 18px) * 0.55);
+  height: calc(var(--checkbox-size, 18px) * 0.55);
+  background-color: var(--text-normal);
+  -webkit-mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='currentColor'%3E%3Cpath d='M10.894 2.553a1 1 0 00-1.788 0l-7 14a1 1 0 001.169 1.409l5-1.429A1 1 0 009 15.571V11a1 1 0 112 0v4.571a1 1 0 00.725.962l5 1.428a1 1 0 001.17-1.408l-7-14z' /%3E%3C/svg%3E");
+  -webkit-mask-size: contain;
+  -webkit-mask-repeat: no-repeat;
+  -webkit-mask-position: center;
+  transform: rotate(-90deg);
+  pointer-events: none;
+  z-index: 2;
+}
+
+/* Reading-mode anchor for the scheduled overlay — bottom-left of checkbox. */
+li[data-bujo-action="scheduled"]::after {
+  inset-inline-start: calc(-1.5 * var(--checkbox-size, 18px));
+  top: calc(var(--checkbox-size, 18px) * 0.5 + 4px);
+}
+
+/* Live Preview anchor. */
+.cm-line[data-bujo-action="scheduled"]::after {
+  left: 7px;
+  top: calc(var(--checkbox-size, 18px) * 0.5 + 4px);
+}
+
+/* Both completed and cancelled events get the task text struck through. */
+li[data-bujo-status="done"],
+li[data-bujo-status="cancelled"],
+.cm-line[data-bujo-status="done"],
+.cm-line[data-bujo-status="cancelled"] {
+  text-decoration: line-through;
+}
+/* Cancelled events additionally fade the task text. */
+li[data-bujo-status="cancelled"],
+.cm-line[data-bujo-status="cancelled"] {
+  color: var(--text-faint);
+}
+/* Day overlay text stays readable, never struck through. */
+li[data-bujo-status]::before,
+.cm-line[data-bujo-status]::before {
+  text-decoration: none;
 }
 
 /* Day overlay — drawn as a `::before` pseudo on the parent that carries
@@ -126,7 +187,9 @@ li[data-bujo-day][data-task="o"] > p > input:checked,
    The pseudo reads the day code via `attr(data-bujo-day)`, so no DOM
    injection is needed. Each mode tunes its own anchor offset. */
 li[data-bujo-day]:not([data-bujo-day=""]),
-.cm-line[data-bujo-day]:not([data-bujo-day=""]) {
+li[data-bujo-action],
+.cm-line[data-bujo-day]:not([data-bujo-day=""]),
+.cm-line[data-bujo-action] {
   position: relative;
 }
 

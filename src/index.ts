@@ -3,11 +3,11 @@ import type { EditorView } from "@codemirror/view";
 import { CommandHandler } from './handlers/command-handler';
 import { EditorMenuHandler } from './handlers/editor-menu-handler';
 import { BulletSuggesterModal } from './handlers/bullet-suggester-modal';
-import { isBulletText, updateBulletType } from './core/bullet-utils';
+import { applyBulletChange, isBulletText } from './core/bullet-utils';
 import { wrapSignifiers } from './core/signifier';
 import { signifierExtension } from './editor/signifier-extension';
 import { deferredEventExtension } from './editor/deferred-event-extension';
-import { DAY_SUFFIX_RE } from './core/dynamic-event-bullet';
+import { SUFFIX_TOKEN_RE, categorizeSuffix } from './core/dynamic-event-bullet';
 import {
   BuJoPluginSettings,
   BuJoPluginSettingTab,
@@ -42,7 +42,7 @@ export default class BuJoPlugin extends Plugin {
           this.app,
           currentChar,
           (bullet) => {
-            editor.setLine(cursor.line, updateBulletType(line, bullet));
+            editor.setLine(cursor.line, applyBulletChange(line, bullet));
           },
         );
         modal.open();
@@ -93,6 +93,16 @@ export default class BuJoPlugin extends Plugin {
           continue
         }
 
+        // Block left-click for [o] events and [-] cancelled so the checkbox
+        // doesn't toggle the marker (which would destroy the bullet
+        // semantics). Right-click still fires below for the swap menu.
+        if (bulletType.character === 'o' || bulletType.character === '-') {
+          checkbox.addEventListener('click', (event: MouseEvent) => {
+            event.preventDefault();
+            event.stopPropagation();
+          }, true);
+        }
+
         // Desktop: right-click on checkbox
         checkbox.addEventListener('contextmenu', (event: MouseEvent) => {
           event.preventDefault();
@@ -139,9 +149,14 @@ export default class BuJoPlugin extends Plugin {
   ): void {
     const menu = new Menu();
     const bulletId = bullet.getAttribute('data-bullet-id');
+    // On an [o] event with a status OR action suffix, expose "Change to:
+    // Event" so the user can revert to upcoming.
+    const hasEventStatus =
+      currentBulletType.character === 'o' &&
+      (bullet.hasAttribute('data-bujo-status') || bullet.hasAttribute('data-bujo-action'));
 
     for (const type of AVAILABLE_BULLETS_TYPES) {
-      if (currentBulletType.character === type.character) continue;
+      if (currentBulletType.character === type.character && !(type.character === 'o' && hasEventStatus)) continue;
 
       menu.addItem((item) => {
         item.setTitle(`Change to: ${type.name}`);
@@ -173,7 +188,7 @@ export default class BuJoPlugin extends Plugin {
 
             const updatedLines = [
               ...lines.slice(0, lineIndex),
-              updateBulletType(lines[bulletIndex], type),
+              applyBulletChange(lines[bulletIndex], type),
               ...lines.slice(bulletIndex + 1),
             ];
 
@@ -222,14 +237,30 @@ function applyDeferredEventOverlay(li: HTMLElement): void {
   const text = firstTextNodeIn(li);
   if (!text || !text.nodeValue) return;
 
-  const m = text.nodeValue.match(DAY_SUFFIX_RE);
-  if (!m) return;
+  let day: string | null = null;
+  let status: "done" | "cancelled" | null = null;
+  let action: "migrated" | "scheduled" | null = null;
 
-  const day = (m[1] ?? "").toUpperCase();
-  text.nodeValue = text.nodeValue.slice(m[0].length).replace(/^\s/, "");
-  li.setAttribute("data-bujo-day", day);
-  // The day text overlay is drawn by CSS `::before` reading
-  // `attr(data-bujo-day)` — no sibling element required.
+  // Eat suffix tokens one by one. Each kind can appear at most once; the
+  // first unrecognized token (or a duplicate) ends the chain.
+  while (text.nodeValue.length > 0) {
+    const m = text.nodeValue.match(SUFFIX_TOKEN_RE);
+    if (!m) break;
+    const cat = categorizeSuffix(m[1]);
+    if (!cat) break;
+    if (cat.kind === "day" && day === null) day = cat.value;
+    else if (cat.kind === "status" && status === null) status = cat.value;
+    else if (cat.kind === "action" && action === null) action = cat.value;
+    else break;
+    text.nodeValue = text.nodeValue.slice(m[0].length);
+  }
+  if (day === null && status === null && action === null) return;
+
+  // Trim a single leading whitespace left over after the last token strip.
+  text.nodeValue = text.nodeValue.replace(/^\s/, "");
+  if (day !== null) li.setAttribute("data-bujo-day", day);
+  if (status !== null) li.setAttribute("data-bujo-status", status);
+  if (action !== null) li.setAttribute("data-bujo-action", action);
 }
 
 function firstTextNodeIn(root: Node): Text | null {

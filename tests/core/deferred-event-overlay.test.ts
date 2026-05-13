@@ -1,11 +1,10 @@
 import { describe, it, expect, beforeEach } from "vitest";
-import { DAY_SUFFIX_RE } from "src/core/dynamic-event-bullet";
+import { SUFFIX_TOKEN_RE, categorizeSuffix } from "src/core/dynamic-event-bullet";
 
 /**
- * Replicates the postprocessor's overlay logic in isolation. This is the same
- * code path as `applyDeferredEventOverlay` in src/index.ts — kept in sync
- * here so the regex + DOM manipulation behavior is testable without bringing
- * in the Obsidian Plugin shim.
+ * Replicates the postprocessor's overlay logic in isolation. This mirrors
+ * `applyDeferredEventOverlay` in src/index.ts — kept in sync so the parsing
+ * + DOM manipulation behavior is testable without the Obsidian Plugin shim.
  */
 function applyDeferredEventOverlay(li: HTMLElement): void {
   const input =
@@ -16,12 +15,26 @@ function applyDeferredEventOverlay(li: HTMLElement): void {
   const text = firstTextNodeIn(li);
   if (!text || !text.nodeValue) return;
 
-  const m = text.nodeValue.match(DAY_SUFFIX_RE);
-  if (!m) return;
+  let day: string | null = null;
+  let status: "done" | "cancelled" | null = null;
+  let action: "migrated" | "scheduled" | null = null;
+  while (text.nodeValue.length > 0) {
+    const m = text.nodeValue.match(SUFFIX_TOKEN_RE);
+    if (!m) break;
+    const cat = categorizeSuffix(m[1]);
+    if (!cat) break;
+    if (cat.kind === "day" && day === null) day = cat.value;
+    else if (cat.kind === "status" && status === null) status = cat.value;
+    else if (cat.kind === "action" && action === null) action = cat.value;
+    else break;
+    text.nodeValue = text.nodeValue.slice(m[0].length);
+  }
+  if (day === null && status === null && action === null) return;
 
-  const day = (m[1] ?? "").toUpperCase();
-  text.nodeValue = text.nodeValue.slice(m[0].length).replace(/^\s/, "");
-  li.setAttribute("data-bujo-day", day);
+  text.nodeValue = text.nodeValue.replace(/^\s/, "");
+  if (day !== null) li.setAttribute("data-bujo-day", day);
+  if (status !== null) li.setAttribute("data-bujo-status", status);
+  if (action !== null) li.setAttribute("data-bujo-action", action);
 }
 
 function firstTextNodeIn(root: Node): Text | null {
@@ -42,75 +55,123 @@ function makeLi(html: string): HTMLLIElement {
   return ul.firstElementChild as HTMLLIElement;
 }
 
-describe("applyDeferredEventOverlay (tight list)", () => {
-  let li: HTMLLIElement;
-
-  beforeEach(() => {
-    // Obsidian's typical tight task-list output.
-    li = makeLi(
-      `<li class="task-list-item" data-task="o" data-line="0"><input class="task-list-item-checkbox" type="checkbox" data-task="o"> [&gt;Thu] Coming up</li>`,
+describe("applyDeferredEventOverlay (day suffix)", () => {
+  it("sets data-bujo-day from `[>Thu]`", () => {
+    const li = makeLi(
+      `<li class="task-list-item" data-task="o"><input class="task-list-item-checkbox" type="checkbox" data-task="o"> [&gt;Thu] meeting</li>`,
     );
-  });
-
-  it("sets data-bujo-day on the li", () => {
     applyDeferredEventOverlay(li);
     expect(li.getAttribute("data-bujo-day")).toBe("THU");
   });
 
-  it("strips the >Thu token from the task text", () => {
+  it("strips the day token from the task text", () => {
+    const li = makeLi(
+      `<li class="task-list-item" data-task="o"><input class="task-list-item-checkbox" type="checkbox" data-task="o"> [&gt;Thu] meeting</li>`,
+    );
     applyDeferredEventOverlay(li);
-    // Find the original text node (the one outside the overlay wrap).
     const taskText = Array.from(li.childNodes)
       .filter((n) => n.nodeType === Node.TEXT_NODE)
       .map((n) => n.nodeValue)
       .join("");
-    expect(taskText.trim()).toBe("Coming up");
+    expect(taskText.trim()).toBe("meeting");
   });
 
-  it("keeps the input as a direct child of the li (no wrapping)", () => {
-    applyDeferredEventOverlay(li);
-    expect(li.querySelector(".bujo-day-wrap")).toBeNull();
-    expect(li.querySelector(".bujo-day-text")).toBeNull();
-    const input = li.querySelector("input");
-    expect(input?.parentElement).toBe(li);
-  });
-});
-
-describe("applyDeferredEventOverlay (bare `>` — unspecified day)", () => {
-  it("sets data-bujo-day to the empty string", () => {
+  it("works for loose lists (content wrapped in <p>)", () => {
     const li = makeLi(
-      `<li class="task-list-item" data-task="o"><input class="task-list-item-checkbox" type="checkbox" data-task="o"> [&gt;] Tomorrow?</li>`,
-    );
-    applyDeferredEventOverlay(li);
-    expect(li.getAttribute("data-bujo-day")).toBe("");
-  });
-
-  it("still strips the [>] token even with no day", () => {
-    const li = makeLi(
-      `<li class="task-list-item" data-task="o"><input class="task-list-item-checkbox" type="checkbox" data-task="o"> [&gt;] Tomorrow?</li>`,
-    );
-    applyDeferredEventOverlay(li);
-    expect(li.textContent?.trim()).toBe("Tomorrow?");
-  });
-});
-
-describe("applyDeferredEventOverlay (loose list — content wrapped in <p>)", () => {
-  it("still finds the text inside a <p> child", () => {
-    const li = makeLi(
-      `<li class="task-list-item" data-task="o"><p><input class="task-list-item-checkbox" type="checkbox" data-task="o"> [&gt;Mon] Coming up</p></li>`,
+      `<li class="task-list-item" data-task="o"><p><input class="task-list-item-checkbox" type="checkbox" data-task="o"> [&gt;Mon] meeting</p></li>`,
     );
     applyDeferredEventOverlay(li);
     expect(li.getAttribute("data-bujo-day")).toBe("MON");
   });
 });
 
-describe("applyDeferredEventOverlay (no day suffix)", () => {
-  it("leaves the li untouched if the task text has no `>` prefix", () => {
+describe("applyDeferredEventOverlay (status suffix)", () => {
+  it("sets data-bujo-status='done' for `[x]`", () => {
+    const li = makeLi(
+      `<li class="task-list-item" data-task="o"><input class="task-list-item-checkbox" type="checkbox" data-task="o"> [x] meeting</li>`,
+    );
+    applyDeferredEventOverlay(li);
+    expect(li.getAttribute("data-bujo-status")).toBe("done");
+  });
+
+  it("sets data-bujo-status='cancelled' for `[-]`", () => {
+    const li = makeLi(
+      `<li class="task-list-item" data-task="o"><input class="task-list-item-checkbox" type="checkbox" data-task="o"> [-] meeting</li>`,
+    );
+    applyDeferredEventOverlay(li);
+    expect(li.getAttribute("data-bujo-status")).toBe("cancelled");
+  });
+});
+
+describe("applyDeferredEventOverlay (action suffix)", () => {
+  it("sets data-bujo-action='migrated' for `[>]`", () => {
+    const li = makeLi(
+      `<li class="task-list-item" data-task="o"><input class="task-list-item-checkbox" type="checkbox" data-task="o"> [&gt;] meeting</li>`,
+    );
+    applyDeferredEventOverlay(li);
+    expect(li.getAttribute("data-bujo-action")).toBe("migrated");
+    expect(li.hasAttribute("data-bujo-day")).toBe(false);
+  });
+
+  it("sets data-bujo-action='scheduled' for `[<]`", () => {
+    const li = makeLi(
+      `<li class="task-list-item" data-task="o"><input class="task-list-item-checkbox" type="checkbox" data-task="o"> [&lt;] meeting</li>`,
+    );
+    applyDeferredEventOverlay(li);
+    expect(li.getAttribute("data-bujo-action")).toBe("scheduled");
+  });
+});
+
+describe("applyDeferredEventOverlay (combinations, any order)", () => {
+  it("`[>Thu] [x]`: day then done", () => {
+    const li = makeLi(
+      `<li class="task-list-item" data-task="o"><input class="task-list-item-checkbox" type="checkbox" data-task="o"> [&gt;Thu] [x] meeting</li>`,
+    );
+    applyDeferredEventOverlay(li);
+    expect(li.getAttribute("data-bujo-day")).toBe("THU");
+    expect(li.getAttribute("data-bujo-status")).toBe("done");
+  });
+
+  it("`[x] [>Thu]`: done then day (order independent)", () => {
+    const li = makeLi(
+      `<li class="task-list-item" data-task="o"><input class="task-list-item-checkbox" type="checkbox" data-task="o"> [x] [&gt;Thu] meeting</li>`,
+    );
+    applyDeferredEventOverlay(li);
+    expect(li.getAttribute("data-bujo-day")).toBe("THU");
+    expect(li.getAttribute("data-bujo-status")).toBe("done");
+  });
+
+  it("`[>] [>Thu]`: action + day on the same line", () => {
+    const li = makeLi(
+      `<li class="task-list-item" data-task="o"><input class="task-list-item-checkbox" type="checkbox" data-task="o"> [&gt;] [&gt;Thu] meeting</li>`,
+    );
+    applyDeferredEventOverlay(li);
+    expect(li.getAttribute("data-bujo-action")).toBe("migrated");
+    expect(li.getAttribute("data-bujo-day")).toBe("THU");
+  });
+});
+
+describe("applyDeferredEventOverlay (no suffixes)", () => {
+  it("leaves the li untouched if the task text has no recognized suffix", () => {
     const li = makeLi(
       `<li class="task-list-item" data-task="o"><input class="task-list-item-checkbox" type="checkbox" data-task="o"> regular event</li>`,
     );
     applyDeferredEventOverlay(li);
     expect(li.hasAttribute("data-bujo-day")).toBe(false);
-    expect(li.querySelector(".bujo-day-text")).toBeNull();
+    expect(li.hasAttribute("data-bujo-status")).toBe(false);
+    expect(li.hasAttribute("data-bujo-action")).toBe(false);
+  });
+
+  it("stops at the first unrecognized token (keeps user content intact)", () => {
+    const li = makeLi(
+      `<li class="task-list-item" data-task="o"><input class="task-list-item-checkbox" type="checkbox" data-task="o"> [foo] meeting</li>`,
+    );
+    applyDeferredEventOverlay(li);
+    expect(li.hasAttribute("data-bujo-day")).toBe(false);
+    const taskText = Array.from(li.childNodes)
+      .filter((n) => n.nodeType === Node.TEXT_NODE)
+      .map((n) => n.nodeValue)
+      .join("");
+    expect(taskText.trim()).toBe("[foo] meeting");
   });
 });

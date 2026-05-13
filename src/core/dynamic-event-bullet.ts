@@ -1,15 +1,36 @@
 /**
- * Parsing helpers for deferred-event day suffixes.
+ * Parsing helpers for the event suffix syntax.
  *
- * Source contract: a single-char `[o]` task followed by a bracketed day token:
- *   - [o] task                  → current-day event (no suffix)
- *   - [o] [>] task              → deferred to unspecified day
- *   - [o] [>Thu] task           → deferred to Thursday (case-insensitive)
+ * Source contract: a single-char `[o]` task followed by zero or more
+ * bracketed suffix tokens, in any order:
  *
- * The `[o]` keeps Obsidian's native task-list parsing (checkbox, click,
- * existing swap commands). The `[>Xxx]` lives in the task text — Obsidian
- * treats it as literal because it isn't single-char.
+ *   - [o] task              → upcoming event
+ *   - [o] [>Thu] task       → deferred to a specific day (renders day overlay)
+ *   - [o] [x] task          → completed event
+ *   - [o] [-] task          → cancelled event
+ *   - [o] [>] task          → migrated event (action; arrow icon)
+ *   - [o] [<] task          → scheduled event (action; arrow icon)
+ *
+ * Combinations are allowed (e.g. `[o] [>Thu] [x] task` → completed event
+ * that was deferred to Thursday). The primary `[o]` keeps Obsidian's native
+ * task-list parsing (checkbox, swap commands).
  */
 
-/** Match `[>]` or `[>Xxx]` (3-letter day) at the start of task text. */
-export const DAY_SUFFIX_RE = /^\s*\[>([A-Za-z]{3})?\](?:\s|$)/;
+/** Match one bracketed suffix token at the start of text. Excludes `[[` (wikilinks). */
+export const SUFFIX_TOKEN_RE = /^\s*\[([^\[\]]+)\](?:\s|$)/;
+
+export type SuffixKind =
+  | { kind: "day"; value: string }
+  | { kind: "status"; value: "done" | "cancelled" }
+  | { kind: "action"; value: "migrated" | "scheduled" };
+
+/** Categorize a suffix token's inner content. Returns null if not recognized. */
+export function categorizeSuffix(content: string): SuffixKind | null {
+  const day = content.match(/^>([A-Za-z]{3})$/);
+  if (day) return { kind: "day", value: day[1].toUpperCase() };
+  if (content === ">") return { kind: "action", value: "migrated" };
+  if (content === "<") return { kind: "action", value: "scheduled" };
+  if (/^[xX]$/.test(content)) return { kind: "status", value: "done" };
+  if (content === "-") return { kind: "status", value: "cancelled" };
+  return null;
+}

@@ -2,7 +2,7 @@ import { Editor, MarkdownView, Menu, MenuItem } from "obsidian";
 import type { EditorView } from "@codemirror/view";
 import BuJoPlugin from "src";
 import { AVAILABLE_BULLETS_TYPES, Bullet } from "../core/bullet-types";
-import { isBulletText, updateBulletType } from "../core/bullet-utils";
+import { applyBulletChange, hasEventStatus, isBulletText } from "../core/bullet-utils";
 
 type MenuItemWithSubmenu = MenuItem & { setSubmenu: () => Menu };
 type EditorWithCm = Editor & { cm: EditorView };
@@ -37,12 +37,13 @@ export class EditorMenuHandler {
         if (!isBulletText(line)) return;
 
         const currentChar = line.match(/- \[(.)\]/)?.[1];
+        const showEventRevert = currentChar === "o" && hasEventStatus(line);
 
         menu.addItem((item) => {
           item.setTitle("Change bullet to").setIcon("list-checks");
           const submenu = (item as MenuItemWithSubmenu).setSubmenu();
           for (const type of AVAILABLE_BULLETS_TYPES) {
-            if (type.character === currentChar) continue;
+            if (type.character === currentChar && !(type.character === "o" && showEventRevert)) continue;
             submenu.addItem((sub) => {
               sub.setTitle(type.name);
               sub.onClick(() => changeBullet(editor, type, lineNumber));
@@ -66,5 +67,5 @@ export class EditorMenuHandler {
 function changeBullet(editor: Editor, type: Bullet, lineNumber: number): void {
   const line = editor.getLine(lineNumber);
   if (!isBulletText(line)) return;
-  editor.setLine(lineNumber, updateBulletType(line, type));
+  editor.setLine(lineNumber, applyBulletChange(line, type));
 }

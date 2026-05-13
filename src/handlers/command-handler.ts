@@ -1,6 +1,6 @@
 import BuJoPlugin from "src";
 import { AVAILABLE_BULLETS_TYPES } from "../core/bullet-types";
-import { isBulletText, updateBulletType } from "../core/bullet-utils";
+import { applyBulletChange, isBulletText } from "../core/bullet-utils";
 
 export class CommandHandler {
   private plugin: BuJoPlugin;
@@ -31,7 +31,7 @@ export class CommandHandler {
                 return false
               }
               
-              const newText = updateBulletType(line, newType)
+              const newText = applyBulletChange(line, newType)
               editor.setLine(cursor.line, newText)
             }
       

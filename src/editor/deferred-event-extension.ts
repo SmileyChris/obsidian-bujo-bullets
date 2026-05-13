@@ -6,31 +6,56 @@ import {
   ViewPlugin,
   ViewUpdate,
 } from "@codemirror/view";
+import { SUFFIX_TOKEN_RE, categorizeSuffix } from "../core/dynamic-event-bullet";
 
 /**
- * Live Preview rendering of deferred-event suffixes on `- [o] ...` lines.
+ * Live Preview rendering of event suffix tokens on `- [o] ...` lines.
  *
- * Adds a line-level `data-bujo-day` attribute (empty / `"THU"` / etc.) so the
- * stylesheet can re-color the native `[o]` checkbox to grey for any deferred
- * form and draw the day text via a CSS `::before` pseudo with `attr()`.
- * Hides the `>Day` source token from view when the cursor isn't on the line.
+ * Stamps `data-bujo-day`, `data-bujo-status`, and/or `data-bujo-action`
+ * onto the `.cm-line` so CSS can re-color/re-mask the checkbox and draw
+ * the day overlay via `::before { content: attr(data-bujo-day) }`. Hides
+ * the suffix source tokens from view when the cursor isn't on the line.
  */
 
-const LINE_RE = /^(\s*-\s\[o\]\s)(\[>([A-Za-z]{3})?\](?:\s|$))/;
+/** Match `- [o] ` followed by one or more bracketed suffix tokens. */
+const LINE_RE = /^(\s*-\s\[o\]\s)((?:\[[^\[\]]+\](?:\s|$))+)/;
 
 export function deferredEventExtension(): Extension {
   return ViewPlugin.fromClass(
     class {
       decorations: DecorationSet;
+      private view: EditorView;
+      private onClickCapture: (event: MouseEvent) => void;
 
       constructor(view: EditorView) {
+        this.view = view;
         this.decorations = build(view);
+
+        // Block left-click on [o] event and [-] cancelled checkboxes so the
+        // native task toggle doesn't strip the marker. Capture-phase +
+        // stopImmediate is required to win against Obsidian's own click
+        // handler. Right-click (contextmenu) is left alone.
+        this.onClickCapture = (event) => {
+          const target = event.target as HTMLElement | null;
+          if (!(target instanceof HTMLInputElement)) return;
+          if (!target.classList.contains("task-list-item-checkbox")) return;
+          const line = target.closest(".cm-line");
+          const task = line?.getAttribute("data-task");
+          if (task !== "o" && task !== "-") return;
+          event.preventDefault();
+          event.stopImmediatePropagation();
+        };
+        view.contentDOM.addEventListener("click", this.onClickCapture, true);
       }
 
       update(u: ViewUpdate): void {
         if (u.docChanged || u.viewportChanged || u.selectionSet) {
           this.decorations = build(u.view);
         }
+      }
+
+      destroy(): void {
+        this.view.contentDOM.removeEventListener("click", this.onClickCapture, true);
       }
     },
     { decorations: (v) => v.decorations },
@@ -58,18 +83,35 @@ function build(view: EditorView): DecorationSet {
       if (!m) continue;
 
       const prefixLen = m[1].length;
-      const token = m[2];
-      const day = (m[3] ?? "").toUpperCase();
+      let span = m[2];
 
-      builder.add(
-        line.from,
-        line.from,
-        Decoration.line({ attributes: { "data-bujo-day": day } }),
-      );
+      // Walk the captured span token by token, categorizing each. Bail at
+      // the first unrecognized token so we don't mis-claim user content.
+      const attributes: Record<string, string> = {};
+      let consumed = 0;
+      while (consumed < span.length) {
+        const tm = span.slice(consumed).match(SUFFIX_TOKEN_RE);
+        if (!tm) break;
+        const cat = categorizeSuffix(tm[1]);
+        if (!cat) break;
+        if (cat.kind === "day" && !("data-bujo-day" in attributes)) {
+          attributes["data-bujo-day"] = cat.value;
+        } else if (cat.kind === "status" && !("data-bujo-status" in attributes)) {
+          attributes["data-bujo-status"] = cat.value;
+        } else if (cat.kind === "action" && !("data-bujo-action" in attributes)) {
+          attributes["data-bujo-action"] = cat.value;
+        } else {
+          break;
+        }
+        consumed += tm[0].length;
+      }
+      if (consumed === 0) continue;
+
+      builder.add(line.from, line.from, Decoration.line({ attributes }));
 
       if (!cursorLines.has(line.number)) {
         const start = line.from + prefixLen;
-        const end = start + token.length;
+        const end = start + consumed;
         builder.add(start, end, Decoration.replace({}));
       }
     }
