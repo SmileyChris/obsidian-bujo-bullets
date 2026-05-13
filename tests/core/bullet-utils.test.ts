@@ -43,4 +43,12 @@ describe("updateBulletType", () => {
   it("round-trips In-Progress back to Incomplete", () => {
     expect(updateBulletType("- [/] task", { name: "Incomplete", character: " " })).toBe("- [ ] task");
   });
+
+  it("swaps a multi-char dynamic event marker", () => {
+    expect(updateBulletType("- [o>Thu] event", { name: "Complete", character: "x" })).toBe("- [x] event");
+  });
+
+  it("swaps an empty dynamic event marker", () => {
+    expect(updateBulletType("- [o>] event", { name: "Complete", character: "x" })).toBe("- [x] event");
+  });
 });

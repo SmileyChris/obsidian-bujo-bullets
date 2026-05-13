@@ -5,7 +5,7 @@ export function updateBulletType(original: string, newType: Bullet): string {
     throw new Error("The provided text is not a valid bullet point.");
   }
 
-  return original.replace(/- \[.\]/, `- [${newType.character}]`);
+  return original.replace(/- \[[^\]]*\]/, `- [${newType.character}]`);
 }
 
 export function isBulletText(text: string): boolean {

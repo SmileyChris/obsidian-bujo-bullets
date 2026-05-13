@@ -48,7 +48,7 @@ function build(view: EditorView, signifiers: Signifier[]): DecorationSet {
 }
 
 function matchLine(text: string, signifiers: Signifier[]): { start: number; length: number } | null {
-  const m = text.match(/^\s*-(?:\s\[.\])?\s+/);
+  const m = text.match(/^\s*-(?:\s\[[^\]]*\])?\s+/);
   if (!m) return null;
   const prefixLen = m[0].length;
   const rest = text.slice(prefixLen);
