@@ -6,6 +6,7 @@ Alternate checkbox types for Obsidian to support [Bullet Journal bullets](https:
 
 - [x] Custom rendering of Bullet Journal styled checkboxes
 - [x] Right-click menu to update bullet type
+- [x] Click an in-progress checkbox to complete it
 - [x] Obsidian commands and hotkeys to update bullet type
 
 ## Installation

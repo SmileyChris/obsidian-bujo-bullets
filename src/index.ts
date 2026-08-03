@@ -18,6 +18,8 @@ import { AVAILABLE_BULLETS_TYPES, Bullet } from "./core/bullet-types";
 export { AVAILABLE_BULLETS_TYPES } from "./core/bullet-types";
 export type { Bullet } from "./core/bullet-types";
 
+const COMPLETE_BULLET = AVAILABLE_BULLETS_TYPES.find((t) => t.character === 'x')!;
+
 export default class BuJoPlugin extends Plugin {
   settings: BuJoPluginSettings;
   commandHandler: CommandHandler;
@@ -103,6 +105,17 @@ export default class BuJoPlugin extends Plugin {
           }, true);
         }
 
+        // Clicking an in-progress [/] checkbox completes the task.
+        // Obsidian's native toggle flips it to unchecked ([ ]), losing the
+        // progress marker — so take over and write [x] explicitly.
+        if (bulletType.character === '/') {
+          checkbox.addEventListener('click', (event: MouseEvent) => {
+            event.preventDefault();
+            event.stopPropagation();
+            this.updateBulletInFile(bullet, COMPLETE_BULLET);
+          }, true);
+        }
+
         // Desktop: right-click on checkbox
         checkbox.addEventListener('contextmenu', (event: MouseEvent) => {
           event.preventDefault();
@@ -160,45 +173,50 @@ export default class BuJoPlugin extends Plugin {
 
       menu.addItem((item) => {
         item.setTitle(`Change to: ${type.name}`);
-        item.onClick(async () => {
-          const vault = this.app.vault;
-          const file = this.app.workspace.getActiveFile();
-          if (!file) return;
-
-          vault.process(file, (data) => {
-            const lines = data.split('\n');
-            let bulletCount = 0;
-            let bulletIndex = -1;
-            let lineIndex = -1;
-            for (let i = 0; i < lines.length; i++) {
-              lineIndex++;
-              if (isBulletText(lines[i])) {
-                if (bulletCount.toString() === bulletId) {
-                  bulletIndex = i;
-                  break;
-                }
-                bulletCount++;
-              }
-            }
-
-            if (bulletIndex === -1) {
-              console.error('Bullet not found');
-              return data;
-            }
-
-            const updatedLines = [
-              ...lines.slice(0, lineIndex),
-              applyBulletChange(lines[bulletIndex], type),
-              ...lines.slice(bulletIndex + 1),
-            ];
-
-            return updatedLines.join('\n');
-          });
+        item.onClick(() => {
+          this.updateBulletInFile(bullet, type);
         });
       });
     }
 
     menu.showAtPosition({ x, y });
+  }
+
+  /**
+   * Rewrite the source line for a reading-mode task-list item to `target`,
+   * locating the bullet by its rendered index (`data-bullet-id`).
+   */
+  private updateBulletInFile(bullet: Element, target: Bullet): void {
+    const vault = this.app.vault;
+    const file = this.app.workspace.getActiveFile();
+    if (!file) return;
+    const bulletId = bullet.getAttribute('data-bullet-id');
+
+    vault.process(file, (data) => {
+      const lines = data.split('\n');
+      let bulletCount = 0;
+      let bulletIndex = -1;
+      for (let i = 0; i < lines.length; i++) {
+        if (isBulletText(lines[i])) {
+          if (bulletCount.toString() === bulletId) {
+            bulletIndex = i;
+            break;
+          }
+          bulletCount++;
+        }
+      }
+
+      if (bulletIndex === -1) {
+        console.error('Bullet not found');
+        return data;
+      }
+
+      return [
+        ...lines.slice(0, bulletIndex),
+        applyBulletChange(lines[bulletIndex], target),
+        ...lines.slice(bulletIndex + 1),
+      ].join('\n');
+    });
   }
 
   async loadSettings() {

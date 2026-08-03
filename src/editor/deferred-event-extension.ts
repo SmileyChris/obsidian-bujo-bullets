@@ -41,9 +41,19 @@ export function deferredEventExtension(): Extension {
           if (!target.classList.contains("task-list-item-checkbox")) return;
           const line = target.closest(".cm-line");
           const task = line?.getAttribute("data-task");
-          if (task !== "o" && task !== "-") return;
-          event.preventDefault();
-          event.stopImmediatePropagation();
+          if (task === "o" || task === "-") {
+            event.preventDefault();
+            event.stopImmediatePropagation();
+            return;
+          }
+          // Clicking an in-progress [/] checkbox completes the task. The
+          // native toggle would flip it to unchecked ([ ]), losing the
+          // progress marker — so take over and write [x] explicitly.
+          if (task === "/") {
+            event.preventDefault();
+            event.stopImmediatePropagation();
+            completeInProgressLine(this.view, target);
+          }
         };
         view.contentDOM.addEventListener("click", this.onClickCapture, true);
       }
@@ -118,4 +128,22 @@ function build(view: EditorView): DecorationSet {
   }
 
   return builder.finish();
+}
+
+/**
+ * Rewrite the in-progress marker (`[/]`) on the line containing `checkbox`
+ * to `[x]`. Finds the marker by locating the checkbox's position in the
+ * document and matching the leading `- [..]` prefix on that line.
+ */
+function completeInProgressLine(view: EditorView, checkbox: HTMLInputElement): void {
+  const pos = view.posAtDOM(checkbox);
+  if (pos < 0) return;
+  const line = view.state.doc.lineAt(pos);
+  const m = line.text.match(/^(\s*-\s\[)[^\]]*(\])/);
+  if (!m) return;
+  const innerStart = line.from + m[1].length;
+  const innerEnd = innerStart + (m[0].length - m[1].length - m[2].length);
+  view.dispatch({
+    changes: { from: innerStart, to: innerEnd, insert: "x" },
+  });
 }
